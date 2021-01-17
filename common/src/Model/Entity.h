@@ -28,6 +28,8 @@
 #include <vecmath/vec.h>
 
 #include <optional>
+#include <string>
+#include <vector>
 
 namespace TrenchBroom {
     namespace Assets {
@@ -59,6 +61,7 @@ namespace TrenchBroom {
             static const vm::bbox3 DefaultBounds;
         private:
             std::vector<EntityProperty> m_properties;
+            std::vector<std::string> m_protectedProperties;
 
             /**
              * Specifies whether this entity has children or not. This does not necessarily correspond to the
@@ -95,6 +98,15 @@ namespace TrenchBroom {
             const std::vector<EntityProperty>& properties() const;
             void setProperties(std::vector<EntityProperty> properties);
 
+            /**
+             * Sets the protected property keys of this entity.
+             *
+             * Protected entity properties are not propagated into linked groups and are not overwritten
+             * when a linked group updates this entity. See also GroupNode::updateLinkedGroups
+             */
+            const std::vector<std::string>& protectedProperties() const;
+            void setProtectedProperties(std::vector<std::string> protectedProperties);
+
             bool pointEntity() const;
             void setPointEntity(bool pointEntity);
 
@@ -109,7 +121,7 @@ namespace TrenchBroom {
             Assets::ModelSpecification modelSpecification() const;
             const vm::mat4x4 modelTransformation() const;
 
-            void addOrUpdateProperty(std::string key, std::string value);
+            void addOrUpdateProperty(std::string key, std::string value, bool defaultToProtected = false);
             void renameProperty(const std::string& oldKey, std::string newKey);
             void removeProperty(const std::string& key);
             void removeNumberedProperty(const std::string& prefix);
