@@ -71,6 +71,7 @@
 #include "Model/NonIntegerVerticesIssueGenerator.h"
 #include "Model/PropertyKeyWithDoubleQuotationMarksIssueGenerator.h"
 #include "Model/PropertyValueWithDoubleQuotationMarksIssueGenerator.h"
+#include "Model/UuidGenerator.h"
 #include "Model/WorldBoundsIssueGenerator.h"
 #include "Model/PointEntityWithBrushesIssueGenerator.h"
 #include "Model/PointFile.h"
@@ -307,7 +308,8 @@ namespace TrenchBroom {
         m_lastSelectionBounds(0.0, 32.0),
         m_selectionBoundsValid(true),
         m_viewEffectsService(nullptr),
-        m_repeatStack(std::make_unique<RepeatStack>()) {
+        m_repeatStack(std::make_unique<RepeatStack>()),
+        m_uuidGenerator(std::make_unique<Model::UuidGenerator>()) {
             bindObservers();
         }
 
@@ -1387,6 +1389,34 @@ namespace TrenchBroom {
             } else {
                 unlock(std::vector<Model::Node*>{m_world.get()});
             }
+        }
+
+        Model::GroupNode* MapDocument::createLinkedDuplicate() {
+            if (!canCreateLinkedDuplicate()) {
+                return nullptr;
+            }
+
+            Transaction transaction(this, "Create Linked Duplicate");
+
+            auto* groupNode = m_selectedNodes.groups().front();
+            if (!groupNode->group().linkedGroupId()) {
+                applyAndSwap(*this, "Set Linked Group ID", m_selectedNodes.groups(), kdl::overload(
+                    [] (Model::Layer&)       { return true; },
+                    [&](Model::Group& group) { group.setLinkedGroupId(m_uuidGenerator->generateId()); return true; },
+                    [] (Model::Entity&)      { return true; },
+                    [] (Model::Brush&)       { return true; }
+                ));
+            }
+
+            auto* groupNodeClone = static_cast<Model::GroupNode*>(groupNode->cloneRecursively(m_worldBounds));
+            auto* suggestedParent = parentForNodes(std::vector<Model::Node*>{groupNode});
+            addNodes({{suggestedParent, {groupNodeClone}}});
+
+            return groupNodeClone;
+        }
+
+        bool MapDocument::canCreateLinkedDuplicate() {
+            return m_selectedNodes.hasOnlyGroups() && m_selectedNodes.groupCount() == 1u;
         }
 
         void MapDocument::renameLayer(Model::LayerNode* layerNode, const std::string& name) {

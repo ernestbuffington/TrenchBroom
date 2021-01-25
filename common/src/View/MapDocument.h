@@ -1,4 +1,4 @@
-/*
+#/*
  Copyright (C) 2010-2017 Kristian Duske
 
  This file is part of TrenchBroom.
@@ -68,6 +68,7 @@ namespace TrenchBroom {
         class SmartTag;
         class TagManager;
         class TexCoordSystemSnapshot;
+        class UuidGenerator;
         class WorldNode;
         enum class WrapStyle;
     }
@@ -133,6 +134,8 @@ namespace TrenchBroom {
              * was changed.
              */
             std::unique_ptr<RepeatStack> m_repeatStack;
+
+            std::unique_ptr<Model::UuidGenerator> m_uuidGenerator;
         public: // notification
             Notifier<Command*> commandDoNotifier;
             Notifier<Command*> commandDoneNotifier;
@@ -359,6 +362,14 @@ namespace TrenchBroom {
 
             void openGroup(Model::GroupNode* group);
             void closeGroup();
+
+            /**
+             * Creates a new group that is linked to the currently selected group and returns the newly created group.
+             *
+             * If the current selection does not consist of exactly one group, then null is returned.
+             */
+            Model::GroupNode* createLinkedDuplicate();
+            bool canCreateLinkedDuplicate();
         public: // layer management
             void renameLayer(Model::LayerNode* layer, const std::string& name);
         private:
