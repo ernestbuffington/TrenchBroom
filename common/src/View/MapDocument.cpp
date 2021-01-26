@@ -1027,7 +1027,7 @@ namespace TrenchBroom {
 
         std::vector<Model::Node*> MapDocument::addNodes(const std::map<Model::Node*, std::vector<Model::Node*>>& nodes) {
             Transaction transaction(this, "Add Objects");
-            const auto result = executeAndStore(AddRemoveNodesCommand::add(nodes));
+            const auto result = executeAndStore(AddRemoveNodesCommand::add(nodes, findAllLinkedGroupsToUpdate(*m_world, kdl::map_keys(nodes))));
             if (!result->success()) {
                 return {};
             }
@@ -1044,7 +1044,7 @@ namespace TrenchBroom {
             Transaction transaction(this);
             while (!removableNodes.empty()) {
                 closeRemovedGroups(removableNodes);
-                executeAndStore(AddRemoveNodesCommand::remove(removableNodes));
+                executeAndStore(AddRemoveNodesCommand::remove(removableNodes, findAllLinkedGroupsToUpdate(*m_world, kdl::map_keys(removableNodes))));
 
                 removableNodes = collectRemovableParents(removableNodes);
             }
@@ -1133,7 +1133,7 @@ namespace TrenchBroom {
             std::map<Model::Node*, std::vector<Model::Node*>> removableNodes = collectRemovableParents(nodesToRemove);
             while (!removableNodes.empty()) {
                 closeRemovedGroups(removableNodes);
-                executeAndStore(AddRemoveNodesCommand::remove(removableNodes));
+                executeAndStore(AddRemoveNodesCommand::remove(removableNodes, findAllLinkedGroupsToUpdate(*m_world, kdl::map_keys(removableNodes))));
 
                 removableNodes = collectRemovableParents(removableNodes);
             }
