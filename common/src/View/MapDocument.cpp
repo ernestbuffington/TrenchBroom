@@ -1463,6 +1463,68 @@ namespace TrenchBroom {
             return m_selectedNodes.hasOnlyGroups() && m_selectedNodes.groupCount() == 1u;
         }
 
+        void MapDocument::unlinkGroups() {
+            const auto selectedGroupsWithLinkGroupIds = kdl::vec_filter(m_selectedNodes.groups(), [](const auto& g) { return g->group().linkedGroupId() != std::nullopt; });
+            auto selectedLinkedGroupIds = kdl::vec_transform(selectedGroupsWithLinkGroupIds, [](const auto& g) { return *g->group().linkedGroupId(); });
+                 selectedLinkedGroupIds = kdl::vec_sort_and_remove_duplicates(std::move(selectedLinkedGroupIds));
+
+            Transaction transaction(this, "Unlink Groups");
+
+            auto singletonLinkSetsAfterUngrouping = std::vector<Model::GroupNode*>{};
+            for (const auto& linkedGroupId : selectedLinkedGroupIds) {
+                auto linkedGroups = Model::findLinkedGroups(*m_world, linkedGroupId); 
+
+                // partition the linked groups into selected and unselected ones
+                const auto it = std::partition(std::begin(linkedGroups), std::end(linkedGroups), [](const auto* linkedGroupNode) { return linkedGroupNode->selected(); });
+
+                auto selectedLinkedGroups = std::vector<Model::GroupNode*>(std::begin(linkedGroups), it);
+                auto unselectedLinkedGroups = std::vector<Model::GroupNode*>(it, std::end(linkedGroups));
+
+                assert(!selectedLinkedGroups.empty());
+                if (!unselectedLinkedGroups.empty()) {
+                    if (selectedLinkedGroups.size() == 1u) {
+                        // unset the linked group ID later
+                        singletonLinkSetsAfterUngrouping.push_back(selectedLinkedGroups.front());
+                    } else {
+                        // set a new linked group ID to the selected linked groups
+                        const auto newLinkedGroupId = m_uuidGenerator->generateId();
+                        applyAndSwap(*this, "Set Linked Group ID", selectedLinkedGroups, findContainingLinkedGroupsToUpdate(*m_world, selectedLinkedGroups), kdl::overload(
+                            [] (Model::Layer&)       { return true; },
+                            [&](Model::Group& group) { group.setLinkedGroupId(newLinkedGroupId); return true; },
+                            [] (Model::Entity&)      { return true; },
+                            [] (Model::Brush&)       { return true; }
+                        ));
+                    }
+
+                    if (unselectedLinkedGroups.size() == 1u) {
+                        // unset the linked group ID later
+                        singletonLinkSetsAfterUngrouping.push_back(unselectedLinkedGroups.front());
+                    }
+                }
+            }
+
+            // unset the linked group IDs of all linked groups which are no longer linked to anything
+            applyAndSwap(*this, "Reset Linked Group ID", singletonLinkSetsAfterUngrouping, findContainingLinkedGroupsToUpdate(*m_world, singletonLinkSetsAfterUngrouping), kdl::overload(
+                [] (Model::Layer&)       { return true; },
+                [&](Model::Group& group) { group.resetLinkedGroupId(); return true; },
+                [] (Model::Entity&)      { return true; },
+                [] (Model::Brush&)       { return true; }
+            ));
+        }
+
+        bool MapDocument::canUnlinkGroups() const {
+            const auto& selectedGroupNodes = m_selectedNodes.groups();
+            return std::any_of(std::begin(selectedGroupNodes), std::end(selectedGroupNodes), [&](const auto* groupNode) {
+                if (const auto linkedGroupId = groupNode->group().linkedGroupId()) {
+                    const auto linkedGroups = Model::findLinkedGroups(*m_world, *linkedGroupId);
+                    return linkedGroups.size() > 1u && std::any_of(std::begin(linkedGroups), std::end(linkedGroups), [](const auto* linkedGroupNode) {
+                        return !linkedGroupNode->selected();
+                    });
+                }
+                return false;
+            });
+        }
+
         void MapDocument::renameLayer(Model::LayerNode* layerNode, const std::string& name) {
             applyAndSwap(*this, "Rename Layer", std::vector<Model::Node*>{layerNode}, {}, kdl::overload(
                 [&](Model::Layer& layer) { layer.setName(name); return true; },

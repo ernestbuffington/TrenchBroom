@@ -256,5 +256,89 @@ namespace TrenchBroom {
             CHECK(groupNode->group().linkedGroupId() != std::nullopt);
             CHECK(linkedGroupNode->group().linkedGroupId() == groupNode->group().linkedGroupId());
         }
+
+        TEST_CASE_METHOD(GroupNodesTest, "GroupNodestTest.unlinkGroups", "[GroupNodesTest]") {
+            auto* brushNode = createBrushNode();
+            document->addNodes({{document->parentForNodes(), {brushNode}}});
+            document->select(brushNode);
+
+            auto* groupNode = document->groupSelection("test");
+            REQUIRE(groupNode != nullptr);
+
+            document->deselectAll();
+            document->select(groupNode);
+
+            SECTION("Unlinking a group that isn't linked") {
+                CHECK_FALSE(document->canUnlinkGroups());
+            }
+
+            SECTION("Unlinking all members of a link set") {
+                auto* linkedGroupNode = document->createLinkedDuplicate();
+                REQUIRE(linkedGroupNode != nullptr);
+                REQUIRE(groupNode->group().linkedGroupId() != std::nullopt);
+                REQUIRE(linkedGroupNode->group().linkedGroupId() == groupNode->group().linkedGroupId());
+
+                document->select(std::vector<Model::Node*>{groupNode, linkedGroupNode});
+                CHECK_FALSE(document->canUnlinkGroups());
+            }
+
+            SECTION("Unlinking one group from a link set with two members") {
+                auto* linkedGroupNode = document->createLinkedDuplicate();
+                REQUIRE(linkedGroupNode != nullptr);
+
+                const auto originalLinkedGroupId = groupNode->group().linkedGroupId();
+                REQUIRE(originalLinkedGroupId != std::nullopt);
+                REQUIRE(linkedGroupNode->group().linkedGroupId() == originalLinkedGroupId);
+
+                document->deselectAll();
+                document->select(linkedGroupNode);
+
+                CHECK(document->canUnlinkGroups());
+                document->unlinkGroups();
+                CHECK(groupNode->group().linkedGroupId() == std::nullopt);
+                CHECK(linkedGroupNode->group().linkedGroupId() == std::nullopt);
+
+                document->undoCommand();
+                CHECK(groupNode->group().linkedGroupId() == originalLinkedGroupId);
+                CHECK(linkedGroupNode->group().linkedGroupId() == originalLinkedGroupId);
+            }
+
+            SECTION("Unlinking multiple groups from a link set with several members") {
+                auto* linkedGroupNode1 = document->createLinkedDuplicate();
+                auto* linkedGroupNode2 = document->createLinkedDuplicate();
+                auto* linkedGroupNode3 = document->createLinkedDuplicate();
+
+                REQUIRE(linkedGroupNode1 != nullptr);
+                REQUIRE(linkedGroupNode2 != nullptr);
+                REQUIRE(linkedGroupNode3 != nullptr);
+
+                const auto originalLinkedGroupId = groupNode->group().linkedGroupId();
+                REQUIRE(originalLinkedGroupId != std::nullopt);
+                REQUIRE(linkedGroupNode1->group().linkedGroupId() == originalLinkedGroupId);
+                REQUIRE(linkedGroupNode2->group().linkedGroupId() == originalLinkedGroupId);
+                REQUIRE(linkedGroupNode3->group().linkedGroupId() == originalLinkedGroupId);
+
+                document->deselectAll();
+                document->select(std::vector<Model::Node*>{linkedGroupNode2, linkedGroupNode3});
+                CHECK(document->canUnlinkGroups());
+
+                document->unlinkGroups();
+                CHECK(groupNode->group().linkedGroupId() == originalLinkedGroupId);
+                CHECK(linkedGroupNode1->group().linkedGroupId() == originalLinkedGroupId);
+
+                CHECK(linkedGroupNode2->group().linkedGroupId() != std::nullopt);
+                CHECK(linkedGroupNode2->group().linkedGroupId() != originalLinkedGroupId);
+                CHECK(linkedGroupNode3->group().linkedGroupId() == linkedGroupNode2->group().linkedGroupId());
+
+                CHECK(document->selectedNodes().groupCount() == 2u);
+                
+                document->undoCommand();
+
+                CHECK(groupNode->group().linkedGroupId() == originalLinkedGroupId);
+                CHECK(linkedGroupNode1->group().linkedGroupId() == originalLinkedGroupId);
+                CHECK(linkedGroupNode2->group().linkedGroupId() == originalLinkedGroupId);
+                CHECK(linkedGroupNode3->group().linkedGroupId() == originalLinkedGroupId);
+            }
+        }
     }
 }
