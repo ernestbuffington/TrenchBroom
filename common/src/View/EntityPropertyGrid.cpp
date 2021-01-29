@@ -213,6 +213,7 @@ namespace TrenchBroom {
             m_table->verticalHeader()->setVisible(false);
             m_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
             m_table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+            m_table->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
             m_table->horizontalHeader()->setSectionsClickable(false);
             m_table->setSelectionBehavior(QAbstractItemView::SelectItems);
 
@@ -345,6 +346,8 @@ namespace TrenchBroom {
                     restoreSelection();
                 }
                 ensureSelectionVisible();
+
+                m_table->setColumnHidden(0, !m_model->shouldShowProtectedProperties());
             });
             updateControlsEnabled();
         }
